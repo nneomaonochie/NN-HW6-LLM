@@ -62,33 +62,7 @@ class BaseLLM:
         - decode the outputs with self.tokenizer.decode
 
         """
-        # Claude Sonnet 4.5
-        formatted_prompt = self.format_prompt(prompt)
-        
-        # Tokenize the prompt
-        inputs = self.tokenizer(
-            formatted_prompt, 
-            return_tensors="pt",
-            padding=True
-        ).to(self.device)
-        
-        # Generate
-        with torch.no_grad():
-            outputs = self.model.generate(
-                input_ids=inputs["input_ids"],
-                attention_mask=inputs["attention_mask"],
-                max_new_tokens=50,
-                do_sample=False,  # Greedy decoding (temperature=0)
-                eos_token_id=self.tokenizer.eos_token_id,
-                pad_token_id=self.tokenizer.pad_token_id,
-            )
-        
-        # Decode only the generated tokens (exclude input)
-        generated_tokens = outputs[:, inputs["input_ids"].shape[1]:]
-        response = self.tokenizer.decode(generated_tokens[0], skip_special_tokens=True)
-        
-        return response
-        # return self.batched_generate([prompt])[0]   # If you feel confident, just use this line of code and move straight to batched_generate.
+        return self.batched_generate([prompt])[0]   # If you feel confident, just use this line of code and move straight to batched_generate.
 
     @overload
     def batched_generate(
