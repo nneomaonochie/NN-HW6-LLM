@@ -28,7 +28,17 @@ class BaseLLM:
         This would be a default implementation applies a basic chat template.
         Override this in subclasses for different behavior (e.g., SFT/RFT models should return raw questions).
         """
-        raise NotImplementedError()
+        # Claude Sonnet 4.5
+        messages = [
+            {"role": "user", "content": question}
+        ]
+        return self.tokenizer.apply_chat_template(
+            messages, 
+            tokenize=False, 
+            add_generation_prompt=True
+        )
+
+
 
     def parse_answer(self, answer: str) -> float:
         """
@@ -52,7 +62,32 @@ class BaseLLM:
         - decode the outputs with self.tokenizer.decode
 
         """
-        raise NotImplementedError()
+        # Claude Sonnet 4.5
+        formatted_prompt = self.format_prompt(prompt)
+        
+        # Tokenize the prompt
+        inputs = self.tokenizer(
+            formatted_prompt, 
+            return_tensors="pt",
+            padding=True
+        ).to(self.device)
+        
+        # Generate
+        with torch.no_grad():
+            outputs = self.model.generate(
+                input_ids=inputs["input_ids"],
+                attention_mask=inputs["attention_mask"],
+                max_new_tokens=50,
+                do_sample=False,  # Greedy decoding (temperature=0)
+                eos_token_id=self.tokenizer.eos_token_id,
+                pad_token_id=self.tokenizer.pad_token_id,
+            )
+        
+        # Decode only the generated tokens (exclude input)
+        generated_tokens = outputs[:, inputs["input_ids"].shape[1]:]
+        response = self.tokenizer.decode(generated_tokens[0], skip_special_tokens=True)
+        
+        return response
         # return self.batched_generate([prompt])[0]   # If you feel confident, just use this line of code and move straight to batched_generate.
 
     @overload
@@ -127,7 +162,69 @@ class BaseLLM:
                 )
             ]
 
-        raise NotImplementedError()
+
+        # Claude Sonnet 4.5
+        # Format all prompts
+        formatted_prompts = [self.format_prompt(p) for p in prompts]
+        
+        # CRITICAL: Set left padding for generation
+        # This aligns all sequences to the right where generation starts
+        self.tokenizer.padding_side = "left"
+        
+        # Tokenize with padding
+        inputs = self.tokenizer(
+            formatted_prompts,
+            return_tensors="pt",
+            padding=True,
+            truncation=True,
+        ).to(self.device)
+        
+        # Determine sampling parameters
+        do_sample = temperature > 0
+        actual_num_return = num_return_sequences if num_return_sequences is not None else 1
+        
+        # Generate
+        with torch.no_grad():
+            outputs = self.model.generate(
+                input_ids=inputs["input_ids"],
+                attention_mask=inputs["attention_mask"],
+                max_new_tokens=50,
+                do_sample=do_sample,
+                temperature=temperature if do_sample else None,
+                num_return_sequences=actual_num_return,
+                eos_token_id=self.tokenizer.eos_token_id,
+                pad_token_id=self.tokenizer.pad_token_id,
+            )
+        
+        # Decode only generated tokens (mask out inputs)
+        input_length = inputs["input_ids"].shape[1]
+        generated_tokens = outputs[:, input_length:]
+        
+        # Batch decode
+        decoded_outputs = self.tokenizer.batch_decode(
+            generated_tokens, 
+            skip_special_tokens=True
+        )
+        
+        # Reshape if num_return_sequences is specified
+        if num_return_sequences is not None:
+            # Reshape flat list to list of lists
+            # decoded_outputs has length: len(prompts) * num_return_sequences
+            result = []
+            for i in range(len(prompts)):
+                start_idx = i * num_return_sequences
+                end_idx = start_idx + num_return_sequences
+                result.append(decoded_outputs[start_idx:end_idx])
+            return result
+        else:
+            # Return flat list
+            return decoded_outputs
+
+
+
+
+
+
 
     def answer(self, *questions) -> list[float]:
         """
