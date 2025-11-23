@@ -100,8 +100,8 @@ def train_model(
     # 2. Configure LoRA (slightly larger for reasoning)
     print("\n2. Configuring LoRA adapter...")
     lora_config = LoraConfig(
-        r=24,                         # Larger rank for chain-of-thought
-        lora_alpha=48,                # 2x rank
+        r=16, #24,        i need to reduce size of the model                 # Larger rank for chain-of-thought
+        lora_alpha=32, #48,                # 2x rank
         target_modules="all-linear",
         lora_dropout=0.05,
         bias="none",
