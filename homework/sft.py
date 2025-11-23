@@ -91,7 +91,7 @@ class TokenizedDataset:
 
 def train_model(
     output_dir: str = "./homework/sft_model",
-    num_train_epochs: int = 1,#5,
+    num_train_epochs: int = 5,
     learning_rate: float = 5e-4,  # Increased from 1e-4
     per_device_train_batch_size: int = 8,  # Reduced from 32 for stability
     **kwargs,
