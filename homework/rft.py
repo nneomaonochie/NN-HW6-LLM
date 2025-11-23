@@ -1,5 +1,5 @@
 from .base_llm import BaseLLM
-from .sft import test_model
+from .sft import test_model, tokenize, TokenizedDataset # Claude Sonnet 4.5
 
 
 class RFTModel(BaseLLM):
@@ -8,7 +8,7 @@ class RFTModel(BaseLLM):
         RFT models are trained on raw questions without chat templates.
         Return the question as-is.
         """
-        raise question
+        return question
 
 def load() -> RFTModel:
     from pathlib import Path
